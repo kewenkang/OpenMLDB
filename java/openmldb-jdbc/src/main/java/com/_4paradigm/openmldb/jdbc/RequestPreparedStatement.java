@@ -128,7 +128,6 @@ public class RequestPreparedStatement implements java.sql.PreparedStatement {
     }
 
     private void setNull(int i) throws SQLException {
-        checkIdx(i);
         boolean notAllowNull = checkNotAllowNull(i);
         if (notAllowNull) {
             throw new SQLException("this column not allow null");
@@ -144,8 +143,6 @@ public class RequestPreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setBoolean(int i, boolean b) throws SQLException {
-        checkIdx(i);
-        checkType(i, DataType.kTypeBool);
         hasSet.set(i - 1, true);
         currentDatas.set(i - 1, b);
     }
@@ -158,16 +155,12 @@ public class RequestPreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setShort(int i, short i1) throws SQLException {
-        checkIdx(i);
-        checkType(i, DataType.kTypeInt16);
         hasSet.set(i - 1, true);
         currentDatas.set(i - 1, i1);
     }
 
     @Override
     public void setInt(int i, int i1) throws SQLException {
-        checkIdx(i);
-        checkType(i, DataType.kTypeInt32);
         hasSet.set(i - 1, true);
         currentDatas.set(i - 1, i1);
 
@@ -175,24 +168,18 @@ public class RequestPreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setLong(int i, long l) throws SQLException {
-        checkIdx(i);
-        checkType(i, DataType.kTypeInt64);
         hasSet.set(i - 1, true);
         currentDatas.set(i - 1, l);
     }
 
     @Override
     public void setFloat(int i, float v) throws SQLException {
-        checkIdx(i);
-        checkType(i, DataType.kTypeFloat);
         hasSet.set(i - 1, true);
         currentDatas.set(i - 1, v);
     }
 
     @Override
     public void setDouble(int i, double v) throws SQLException {
-        checkIdx(i);
-        checkType(i, DataType.kTypeDouble);
         hasSet.set(i - 1, true);
         currentDatas.set(i - 1, v);
     }
@@ -209,8 +196,6 @@ public class RequestPreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setString(int i, String s) throws SQLException {
-        checkIdx(i);
-        checkType(i, DataType.kTypeString);
         if (s == null) {
             setNull(i);
             return;
@@ -229,8 +214,6 @@ public class RequestPreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setDate(int i, java.sql.Date date) throws SQLException {
-        checkIdx(i);
-        checkType(i, DataType.kTypeDate);
         if (date == null) {
             setNull(i);
             return;
@@ -278,9 +261,9 @@ public class RequestPreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void clearParameters() {
+        currentDatas.clear();
         for (int i = 0; i < hasSet.size(); i++) {
             hasSet.set(i, false);
-            currentDatas.set(i, null);
         }
         stringsLen.clear();
     }
@@ -308,34 +291,45 @@ public class RequestPreparedStatement implements java.sql.PreparedStatement {
         if (!ok) {
             throw new SQLException("build data row failed");
         }
-        for (int i = 0; i < this.currentSchema.GetColumnCnt(); i++) {
+        int columnCount = this.currentSchema.GetColumnCnt();
+        for (int i = 0; i < columnCount; i++) {
             DataType dataType = this.currentSchema.GetColumnType(i);
             Object data = this.currentDatas.get(i);
             if (data == null) {
                 ok = this.currentRow.AppendNULL();
             } else {
-                if (DataType.kTypeBool.equals(dataType)) {
-                    ok = this.currentRow.AppendBool((boolean) data);
-                } else if (DataType.kTypeDate.equals(dataType)) {
-                    java.sql.Date date = (java.sql.Date) data;
-                    ok = this.currentRow.AppendDate(date.getYear() + 1900, date.getMonth() + 1, date.getDate());
-                } else if (DataType.kTypeDouble.equals(dataType)) {
-                    ok = this.currentRow.AppendDouble((double) data);
-                } else if (DataType.kTypeFloat.equals(dataType)) {
-                    ok = this.currentRow.AppendFloat((float) data);
-                } else if (DataType.kTypeInt16.equals(dataType)) {
-                    ok = this.currentRow.AppendInt16((short) data);
-                } else if (DataType.kTypeInt32.equals(dataType)) {
-                    ok = this.currentRow.AppendInt32((int) data);
-                } else if (DataType.kTypeInt64.equals(dataType)) {
-                    ok = this.currentRow.AppendInt64((long) data);
-                } else if (DataType.kTypeString.equals(dataType)) {
-                    byte[] bdata = (byte[])data;
-                    ok = this.currentRow.AppendString(bdata, bdata.length);
-                } else if (DataType.kTypeTimestamp.equals(dataType)) {
-                    ok = this.currentRow.AppendTimestamp((long) data);
-                } else {
-                    throw new SQLException("unkown data type " + dataType.toString());
+                switch(dataType) {
+                    case kTypeBool: 
+                        ok = this.currentRow.AppendBool((boolean) data); 
+                        break;
+                    case kTypeDate: 
+                        java.sql.Date date = (java.sql.Date) data;
+                        ok = this.currentRow.AppendDate(date.getYear() + 1900, date.getMonth() + 1, date.getDate());
+                        break;
+                    case kTypeDouble:
+                        ok = this.currentRow.AppendDouble((double) data);
+                        break;
+                    case kTypeFloat:
+                        ok = this.currentRow.AppendFloat((float) data);
+                        break;
+                    case kTypeInt16:
+                        ok = this.currentRow.AppendInt16((short) data);
+                        break;
+                    case kTypeInt32:
+                        ok = this.currentRow.AppendInt32((int) data);
+                        break;
+                    case kTypeInt64:
+                        ok = this.currentRow.AppendInt64((long) data);
+                        break;
+                    case kTypeString:
+                        byte[] bdata = (byte[])data;
+                        ok = this.currentRow.AppendString(bdata, bdata.length);
+                        break;
+                    case kTypeTimestamp:
+                        ok = this.currentRow.AppendTimestamp((long) data);
+                        break;
+                    default:
+                        throw new SQLException("unkown data type " + dataType.toString());
                 }
             }
             if (!ok) {

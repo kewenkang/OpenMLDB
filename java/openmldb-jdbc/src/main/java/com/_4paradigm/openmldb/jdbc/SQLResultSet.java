@@ -19,6 +19,7 @@ package com._4paradigm.openmldb.jdbc;
 import com._4paradigm.openmldb.DataType;
 import com._4paradigm.openmldb.QueryFuture;
 import com._4paradigm.openmldb.Schema;
+import com._4paradigm.openmldb.sdk.Common;
 
 import java.io.InputStream;
 import java.io.Reader;
@@ -34,11 +35,17 @@ public class SQLResultSet implements ResultSet {
     private int rowNum = 0;
     private QueryFuture queryFuture;
     private Schema schema;
+    private com._4paradigm.openmldb.sdk.Schema sdkSchema;
 
     public SQLResultSet(com._4paradigm.openmldb.ResultSet resultSet) {
         this.resultSet = resultSet;
         if (resultSet != null) {
             this.schema = resultSet.GetSchema();
+            try {
+                this.sdkSchema = Common.convertSchema(this.schema);
+            } catch(SQLException e) {
+                this.sdkSchema = null;
+            }
         }
     }
 
@@ -47,6 +54,11 @@ public class SQLResultSet implements ResultSet {
         this.queryFuture = future;
         if (resultSet != null) {
             this.schema = resultSet.GetSchema();
+            try {
+                this.sdkSchema = Common.convertSchema(this.schema);
+            } catch(SQLException e) {
+                this.sdkSchema = null;
+            }
         }
     }
 
@@ -67,7 +79,7 @@ public class SQLResultSet implements ResultSet {
         if (i <= 0) {
             throw new SQLException("index underflow");
         }
-        if (i > schema.GetColumnCnt()) {
+        if (sdkSchema == null || i > sdkSchema.getColumnList().size()) {
             throw new SQLException("index overflow");
         }
     }
@@ -79,8 +91,10 @@ public class SQLResultSet implements ResultSet {
     }
 
     private void checkDataType(int i, DataType type) throws SQLException {
-        if (schema.GetColumnType(i - 1) != type) {
-            throw new SQLException("data type not match");
+        if (sdkSchema == null ||
+            !Common.sqlTypeToDataType(sdkSchema.getColumnList().get(i - 1).getSqlType()).equals(type)) {
+            throw new SQLException(String.format("data type not match, get %s and expect %s",
+                    schema.GetColumnType(i - 1), type));
         }
     }
 
@@ -123,19 +137,12 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public String getString(int i) throws SQLException {
-        check(i, DataType.kTypeString);
-        if (this.resultSet.IsNULL(i - 1)) {
-            return null;
-        }
+        // No need to check IsNULL, because IsNULL is done in GetStringUnsafe
         return this.resultSet.GetStringUnsafe(i - 1);
     }
 
     @Override
     public boolean getBoolean(int i) throws SQLException {
-        check(i, DataType.kTypeBool);
-        if (this.resultSet.IsNULL(i - 1)) {
-            return false;
-        }
         return this.resultSet.GetBoolUnsafe(i - 1);
     }
 
@@ -147,46 +154,26 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public short getShort(int i) throws SQLException {
-        check(i, DataType.kTypeInt16);
-        if (this.resultSet.IsNULL(i - 1)) {
-            return 0;
-        }
         return this.resultSet.GetInt16Unsafe(i - 1);
     }
 
     @Override
     public int getInt(int i) throws SQLException {
-        check(i, DataType.kTypeInt32);
-        if (this.resultSet.IsNULL(i - 1)) {
-            return 0;
-        }
         return resultSet.GetInt32Unsafe(i - 1);
     }
 
     @Override
     public long getLong(int i) throws SQLException {
-        check(i, DataType.kTypeInt64);
-        if (this.resultSet.IsNULL(i - 1)) {
-            return 0;
-        }
         return this.resultSet.GetInt64Unsafe(i - 1);
     }
 
     @Override
     public float getFloat(int i) throws SQLException {
-        check(i, DataType.kTypeFloat);
-        if (this.resultSet.IsNULL(i - 1)) {
-            return 0.0f;
-        }
         return this.resultSet.GetFloatUnsafe(i - 1);
     }
 
     @Override
     public double getDouble(int i) throws SQLException {
-        check(i, DataType.kTypeDouble);
-        if (this.resultSet.IsNULL(i - 1)) {
-            return 0.0;
-        }
         return resultSet.GetDoubleUnsafe(i - 1);
     }
 
@@ -204,10 +191,6 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public Date getDate(int i) throws SQLException {
-        check(i, DataType.kTypeDate);
-        if (this.resultSet.IsNULL(i - 1)) {
-            return null;
-        }
         com._4paradigm.openmldb.Date date = this.resultSet.GetStructDateUnsafe(i - 1);
         return new Date(date.getYear() - 1900, date.getMonth() - 1, date.getDay());
     }
@@ -220,10 +203,6 @@ public class SQLResultSet implements ResultSet {
 
     @Override
     public Timestamp getTimestamp(int i) throws SQLException {
-        check(i, DataType.kTypeTimestamp);
-        if (this.resultSet.IsNULL(i - 1)) {
-            return null;
-        }
         return new Timestamp(this.resultSet.GetTimeUnsafe(i -1));
     }
 

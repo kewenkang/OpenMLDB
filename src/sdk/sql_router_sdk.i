@@ -21,6 +21,9 @@
 %include stl.i
 %include stdint.i
 %include std_vector.i
+%include "enums.swg"
+%javaconst(1);
+
 #ifdef SWIGJAVA
 %include various.i
 %apply char *BYTE { char *string_buffer_var_name };
